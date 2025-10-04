@@ -1,0 +1,3 @@
+bash evaluate_synthetic_dataset_full_llama.sh
+bash evaluate_synthetic_dataset_rag_llama.sh
+bash evaluate_synthetic_dataset_cachenotes_llama.sh

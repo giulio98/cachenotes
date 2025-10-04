@@ -1,0 +1,4 @@
+bash evaluate_companynotes_cachenotes_llama.sh
+bash evaluate_companynotes_cachenotes_qwen.sh
+bash evaluate_companynotes_rag_llama.sh
+bash evaluate_companynotes_rag_qwen.sh

@@ -1,0 +1,8 @@
+bash evaluate_ruler_all_qwen.sh
+bash evaluate_ruler_cachenotes_qwen.sh
+bash evaluate_ruler_expected_attention_qwen.sh
+bash evaluate_ruler_finch_qwen.sh
+bash evaluate_ruler_all_llama.sh
+bash evaluate_ruler_cachenotes_llama.sh
+bash evaluate_ruler_expected_attention_llama.sh
+bash evaluate_ruler_finch_llama.sh

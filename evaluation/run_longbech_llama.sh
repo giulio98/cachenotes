@@ -1,0 +1,6 @@
+bash evaluate_longbench_cachenotes_llama.sh
+bash evaluate_longbench_expected_attention_llama.sh
+bash evaluate_longbench_finch_llama.sh
+bash evaluate_longbench_kvzip_llama.sh
+bash evaluate_longbench_full_llama.sh
+bash evaluate_longbench_rag_llama.sh

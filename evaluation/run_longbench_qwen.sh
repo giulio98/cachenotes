@@ -1,0 +1,6 @@
+bash evaluate_longbench_cachenotes_qwen.sh
+bash evaluate_longbench_expected_attention_qwen.sh
+bash evaluate_longbench_finch_qwen.sh
+bash evaluate_longbench_kvzip_qwen.sh
+bash evaluate_longbench_full_qwen.sh
+bash evaluate_longbench_rag_qwen.sh
