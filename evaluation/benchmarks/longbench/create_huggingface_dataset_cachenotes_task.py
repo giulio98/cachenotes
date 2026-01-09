@@ -1,4 +1,4 @@
- 
+
 import argparse, sys, math
 from typing import List, Dict, Any, Tuple
 
@@ -15,7 +15,7 @@ def parse_args():
         description="Create LongBench cheatsheets with vLLM (no Ray) and push to HF."
     )
     p.add_argument("--model_name", type=str, default="Qwen/Qwen3-4B-Instruct-2507")
-    p.add_argument("--repo_id", type=str, default="anon-submission/LongBench-Qwen3")
+    p.add_argument("--repo_id", type=str, default="giulio98/LongBench-Qwen3")
     p.add_argument("--max_new_tokens_cheatsheet", type=int, default=2048)
     p.add_argument("--temperature", type=float, default=0.0)
     p.add_argument("--top_p", type=float, default=1.0)

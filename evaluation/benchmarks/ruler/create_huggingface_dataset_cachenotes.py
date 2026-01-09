@@ -15,7 +15,7 @@ def parse_args():
         description="Create ruler cheatsheets with vLLM (no Ray) and push to HF."
     )
     p.add_argument("--model_name", type=str, default="Qwen/Qwen3-4B-Instruct-2507")
-    p.add_argument("--repo_id", type=str, default="anon-submission/ruler-Qwen")
+    p.add_argument("--repo_id", type=str, default="giulio98/ruler-Qwen")
     p.add_argument("--max_new_tokens_cheatsheet", type=int, default=2048)
     p.add_argument("--temperature", type=float, default=0.0)
     p.add_argument("--top_p", type=float, default=1.0)
@@ -71,7 +71,7 @@ def main():
 
     for task in TASKS:
         print(f"\n=== Processing task: {task} ===")
-        hf_ds = load_dataset("anon-submission/ruler", data_dir=task, split="test")
+        hf_ds = load_dataset("giulio98/ruler", data_dir=task, split="test")
 
         # Add fields (+ stable row id)
         def add_fields(x, i):

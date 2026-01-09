@@ -1,4 +1,5 @@
- 
+# SPDX-FileCopyrightText: Copyright (c) 1993-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 
 
 from datasets import Dataset, load_dataset
@@ -146,7 +147,7 @@ for task in [
 
     # Push to hub
     dataset = Dataset.from_pandas(df)
-    dataset.push_to_hub("anon-submission/LongBench", config_name=task, split="test")
+    dataset.push_to_hub("giulio98/LongBench", config_name=task, split="test")
 
 # Longbench-e
 for task in [
@@ -193,4 +194,4 @@ for task in [
 
     # Push to hub
     dataset = Dataset.from_pandas(df)
-    dataset.push_to_hub("anon-submission/LongBench", config_name=f"{task}_e", split="test")
+    dataset.push_to_hub("giulio98/LongBench", config_name=f"{task}_e", split="test")

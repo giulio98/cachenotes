@@ -1,4 +1,5 @@
- 
+# SPDX-FileCopyrightText: Copyright (c) 1993-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0 
 
 
 import re
@@ -74,7 +75,7 @@ def get_dataframe(path):
 
 if __name__ == "__main__":
     data_dir = Path("/mnt/workspace/projects/RULER/scripts/data/data/")  # output of the generate.sh script
-    repo_id = "anon-submission/ruler"
+    repo_id = "giulio98/ruler"
 
     # Loop over all the context lengths
     for path in data_dir.glob("*/"):

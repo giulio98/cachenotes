@@ -15,7 +15,7 @@ def parse_args():
         description="Create LongBench cheatsheets with vLLM (no Ray) and push to HF."
     )
     p.add_argument("--model_name", type=str, default="meta-llama/Meta-Llama-3.1-8B-Instruct")
-    p.add_argument("--repo_id", type=str, default="anon-submission/LongBench-lcc")
+    p.add_argument("--repo_id", type=str, default="giulio98/LongBench-lcc")
     p.add_argument("--max_new_tokens_cheatsheet", type=int, default=2048)
     p.add_argument("--temperature", type=float, default=0.0)
     p.add_argument("--top_p", type=float, default=1.0)

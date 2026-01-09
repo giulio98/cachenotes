@@ -1,4 +1,6 @@
- 
+# SPDX-FileCopyrightText: Copyright (c) 1993-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+# Modified by Giulio on 2026-01-08
 
 import logging
 import math
@@ -40,12 +42,17 @@ class KVzipPress(BasePress):
         Whether to enable uniform compression ratios across layers.
         When False, while the overall KV cache compression ratio is maintained,
         each layer has a different compression ratio.
+    headwise : bool, default=False
+        Whether to enable uniform compression ratios across KV heads.
+        When True, each KV head in each (non-skipped) layer prunes the same number
+        of KV positions: int(ctx_len * compression_ratio).
     n_sink : int, default=4
         Number of initial tokens to preserve as attention sinks.
     """
 
     compression_ratio: float = 0.0
     layerwise: bool = False
+    headwise: bool = False
     n_sink: int = 4
 
     def __post_init__(self):
@@ -115,10 +122,11 @@ class KVzipPress(BasePress):
 
         def wrapped_forward(model_self, *args, **kwargs):
             self._context_ids = kwargs["input_ids"]
-            assert (
-                "past_key_value" in kwargs or "past_key_values" in kwargs
-            ), f"KVzipPress requires 'past_key_value' or 'past_key_values' during prefilling. Got {kwargs.keys()}"
-            self._cache = kwargs.get("past_key_values", None) or kwargs.get("past_key_value", None)
+            # assert (
+            #     "past_key_value" in kwargs or "past_key_values" in kwargs
+            # ), f"KVzipPress requires 'past_key_value' or 'past_key_values' during prefilling. Got {kwargs.keys()}"
+            # self._cache = kwargs.get("past_key_values", None) or kwargs.get("past_key_value", None)
+            self._cache = kwargs["past_key_values"]
             return original_forward(*args, **kwargs)
 
         model.model.forward = MethodType(wrapped_forward, model.model)
@@ -350,38 +358,93 @@ class KVzipPress(BasePress):
         """
         Obtain the indices of KV pairs to be evicted.
         Adopted from adakv_press.compress (fake compression). KVzip does not rely on safeguards.
+
+        If self.headwise is True:
+        - prune a uniform number of KV *positions* per KV head in each (non-skipped) layer:
+            k = int(ctx_len * compression_ratio)
+        - i.e., bottom-k within each head (not across heads).
         """
-        if self.compression_ratio > 0:
-            n_layer, bsz, num_key_value_heads, ctx_len = self.score_val.shape
+        if self.compression_ratio <= 0:
+            return
 
-            # calculate the pruned KV pairs across layers
-            if self.layerwise:
-                nl = int(num_key_value_heads * ctx_len * self.compression_ratio)
-                n_pruned_layers = nl * torch.ones(n_layer, device=self.score_val.device, dtype=torch.int)
-            else:
-                score_sort = torch.sort(self.score_val.reshape(-1)).values  # ascending order
-                n = max(int(len(score_sort) * self.compression_ratio) - 1, 0)
-                thres = score_sort[n].item()
+        n_layer, bsz, num_key_value_heads, ctx_len = self.score_val.shape
 
-                n_pruned_layers = (self.score_val.reshape(n_layer, -1) <= thres).sum(-1)  # n_prune
+        # --- NEW: uniform per head pruning ---
+        if self.headwise:
+            k = int(ctx_len * self.compression_ratio)
+            if k <= 0:
+                return
 
             for layer in model.model.layers:
                 if isinstance(model, Gemma3ForCausalLM) and layer.is_sliding:
                     # Skip layers with sliding window attention, only for Gemma3
                     continue
+
                 module = layer.self_attn
                 layer_idx = int(module.layer_idx)
 
                 assert module.config._attn_implementation != "eager", "eager mode not supported"
 
-                scores = self.score_val[layer_idx]
+                scores = self.score_val[layer_idx]  # (bsz, num_kv_heads, ctx_len)
 
-                # Compute bottom-k across heads
-                n_pruned = n_pruned_layers[layer_idx]
-                indices = torch.topk(-scores.reshape(bsz, -1), n_pruned, dim=1).indices.flatten()
+                # bottom-k per head (uniform across heads)
+                # idx shape: (bsz, num_kv_heads, k)
+                idx = torch.topk(-scores, k, dim=-1).indices
 
-                # Save indices to mask during the attention mechanism. Please refer to attention_patch.py for details
-                batch_indices = torch.arange(bsz, device=n_pruned.device).repeat_interleave(n_pruned)
-                head_indices = indices // ctx_len
-                seq_indices = indices % ctx_len
+                device = scores.device
+                batch_indices = (
+                    torch.arange(bsz, device=device)[:, None, None]
+                    .expand(bsz, num_key_value_heads, k)
+                    .reshape(-1)
+                )
+                head_indices = (
+                    torch.arange(num_key_value_heads, device=device)[None, :, None]
+                    .expand(bsz, num_key_value_heads, k)
+                    .reshape(-1)
+                )
+                seq_indices = idx.reshape(-1)
+
                 module.masked_key_indices = (batch_indices, head_indices, seq_indices)
+
+            return
+
+        # --- ORIGINAL behavior (across-head bottom-k), optionally uniform per layer ---
+        if self.layerwise:
+            nl = int(num_key_value_heads * ctx_len * self.compression_ratio)
+            n_pruned_layers = nl * torch.ones(n_layer, device=self.score_val.device, dtype=torch.int)
+        else:
+            score_sort = torch.sort(self.score_val.reshape(-1)).values  # ascending order
+            n = max(int(len(score_sort) * self.compression_ratio) - 1, 0)
+            thres = score_sort[n].item()
+            n_pruned_layers = (self.score_val.reshape(n_layer, -1) <= thres).sum(-1)  # n_prune
+
+        for layer in model.model.layers:
+            if isinstance(model, Gemma3ForCausalLM) and layer.is_sliding:
+                continue
+
+            module = layer.self_attn
+            layer_idx = int(module.layer_idx)
+
+            assert module.config._attn_implementation != "eager", "eager mode not supported"
+
+            scores = self.score_val[layer_idx]  # (bsz, num_kv_heads, ctx_len)
+
+            n_pruned = int(n_pruned_layers[layer_idx].item())
+            if n_pruned <= 0:
+                # mask nothing
+                module.masked_key_indices = (
+                    torch.empty(0, dtype=torch.long, device=scores.device),
+                    torch.empty(0, dtype=torch.long, device=scores.device),
+                    torch.empty(0, dtype=torch.long, device=scores.device),
+                )
+                continue
+
+            # bottom-k across heads (flatten head x seq)
+            flat = scores.reshape(bsz, -1)
+            indices = torch.topk(-flat, n_pruned, dim=1).indices.flatten()
+
+            batch_indices = torch.arange(bsz, device=scores.device).repeat_interleave(n_pruned)
+            head_indices = indices // ctx_len
+            seq_indices = indices % ctx_len
+
+            module.masked_key_indices = (batch_indices, head_indices, seq_indices)
